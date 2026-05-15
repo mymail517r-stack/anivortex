@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import StreamingSelector from '@/components/StreamingSelector';
-import { getAnimeDetails, getAnimeEpisodes, getStreamingSources, getAnimeImage, getAnimeCoverImage } from '@/lib/api';
+import EpisodePlayer from '@/components/EpisodePlayer';
+import { getAnimeDetails, getAnimeEpisodes, getStreamingSources, getAnimeImageUrl, getPlaceholder, getEpisodeStreamUrl } from '@/lib/api';
 import { ChevronLeft, Play, Share2, BookmarkPlus, Volume2, Settings, Globe } from 'lucide-react';
 import { useParams } from 'next/navigation';
 
