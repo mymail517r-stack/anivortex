@@ -8,18 +8,22 @@ interface AnimeCardProps {
 }
 
 export default function AnimeCard({ anime }: AnimeCardProps) {
-  // Get working image URL from Jikan API
+  // Handle both full anime objects and watchlist items
   const imageUrl = 
     anime?.images?.jpg?.large_image_url ||
     anime?.images?.jpg?.image_url ||
+    anime?.image || // fallback for watchlist items
     `https://via.placeholder.com/225x318?text=${encodeURIComponent(anime?.title || 'Anime')}&bg=222&fg=fff`;
 
   const title = anime?.title || 'Unknown Anime';
   const score = anime?.score || 'N/A';
   const episodes = anime?.episodes || '?';
+  
+  // Support both mal_id (from API) and id (from watchlist)
+  const animeId = anime?.mal_id || anime?.id;
 
   return (
-    <Link href={`/anime/${anime.mal_id}`}>
+    <Link href={`/anime/${animeId}`}>
       <div className="group relative overflow-hidden rounded-lg bg-gray-800 hover:shadow-2xl hover:shadow-red-500/50 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
         {/* Image Container */}
         <div className="relative w-full aspect-[225/318] bg-gray-700 overflow-hidden">

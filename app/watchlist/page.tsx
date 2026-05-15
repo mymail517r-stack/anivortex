@@ -51,12 +51,7 @@ export default function WatchlistPage() {
               {watchlist.map((anime) => (
                 <AnimeCard
                   key={anime.id}
-                  id={anime.id}
-                  title={anime.title}
-                  image={anime.image}
-                  score={0}
-                  episodes={0}
-                  year={new Date().getFullYear()}
+                  anime={anime}
                 />
               ))}
             </div>

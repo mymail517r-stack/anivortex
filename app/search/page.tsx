@@ -73,12 +73,7 @@ function SearchContent() {
             {results.map((anime) => (
               <AnimeCard
                 key={anime.mal_id}
-                id={anime.mal_id}
-                title={anime.title}
-                image={anime.images?.jpg?.image_url || ''}
-                score={anime.score || 0}
-                episodes={anime.episodes || 0}
-                year={anime.year || new Date().getFullYear()}
+                anime={anime}
               />
             ))}
           </div>
