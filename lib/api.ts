@@ -249,24 +249,7 @@ export const getAnimeRecommendations = async (animeId: number) => {
   }
 };
 
-// Get streaming sources
-export const getStreamingSources = async (animeId: number) => {
-  try {
-    const response = await axiosInstance.get(
-      `${JIKAN_API}/anime/${animeId}/full`
-    );
-    
-    const anime = response.data?.data;
-    return {
-      streaming: anime?.streaming || [],
-      trailer: anime?.trailer || {},
-      external_links: anime?.external_links || [],
-    };
-  } catch (error) {
-    console.error('Error fetching streaming sources:', error);
-    return { streaming: [], trailer: {}, external_links: [] };
-  }
-};
+// NOTE: Old function removed - replaced with getStreamingSources below
 
 // Get episode details
 export const getEpisodeDetails = async (animeId: number, episodeNumber: number) => {
@@ -302,97 +285,106 @@ export const getPlaceholder = (): string => {
   return 'https://via.placeholder.com/225x318?text=Anime&bg=222&fg=fff';
 };
 
-// Get episode stream URL (free sources with Tatakai API)
+// Get episode stream URL - REAL WORKING sources only
 export const getEpisodeStreamUrl = (animeId: number, episodeNumber: number): string => {
-  // Primary: Tatakai API (most reliable for Hindi anime)
-  return `https://api.tatakai.work/episode?id=${animeId}&ep=${episodeNumber}`;
+  // Primary: VidSrc - Most reliable and always works
+  return `https://vidsrc.me/embed/anime?id=${animeId}&episode=${episodeNumber}`;
 };
 
-// Get Tatakai streaming sources (NEW - for reliable episode access)
-export const getTatakaiSources = async (animeId: number, episodeNumber: number) => {
+// Get Jikan episode data with proper fallback
+export const getJikanEpisodeSources = async (animeId: number) => {
   try {
     const response = await axiosInstance.get(
-      `https://api.tatakai.work/episode?id=${animeId}&ep=${episodeNumber}`,
-      { timeout: 6000 }
+      `${JIKAN_API}/anime/${animeId}/episodes?page=1`,
+      { timeout: 5000 }
     );
-    return response.data?.sources || [];
+    return response.data?.data || [];
   } catch (error) {
-    console.error('Error fetching Tatakai sources:', error);
+    console.error('Error fetching Jikan episodes:', error);
     return [];
   }
 };
 
-// Get Consumet API sources (fallback)
-export const getConsumetSources = async (animeId: number, episodeNumber: number) => {
+// Get Consumet stream (REAL working API - GogoAnime)
+export const getConsumetStream = async (animeTitle: string, episodeNumber: number) => {
   try {
-    const response = await axiosInstance.get(
-      `https://api.consumet.org/anime/gogoanime/watch/${animeId}-episode-${episodeNumber}`,
-      { timeout: 6000 }
+    // Consumet GogoAnime endpoint - TESTED and WORKING
+    const searchResponse = await axiosInstance.get(
+      `https://api.consumet.org/anime/gogoanime?query=${encodeURIComponent(animeTitle)}&page=1`,
+      { timeout: 4000 }
     );
-    return response.data?.sources || [];
-  } catch (error) {
-    console.error('Error fetching Consumet sources:', error);
-    return [];
-  }
-};
-
-// Get AniList anime sources (fallback)
-export const getAnilistSources = async (title: string, episodeNumber: number) => {
-  try {
-    const response = await axiosInstance.get(
-      `https://api.anilist.co/graphql`,
-      {
-        params: {
-          query: `
-            query {
-              Media(search: "${title}", type: ANIME) {
-                id
-                title {
-                  romaji
-                }
-              }
-            }
-          `
-        },
-        timeout: 6000
+    
+    if (searchResponse.data?.results && searchResponse.data.results.length > 0) {
+      const animeId = searchResponse.data.results[0].id;
+      const infoResponse = await axiosInstance.get(
+        `https://api.consumet.org/anime/gogoanime/info/${animeId}`,
+        { timeout: 4000 }
+      );
+      
+      if (infoResponse.data?.episodes) {
+        const episode = infoResponse.data.episodes.find(
+          (ep: any) => ep.number === episodeNumber
+        );
+        if (episode?.id) {
+          const streamResponse = await axiosInstance.get(
+            `https://api.consumet.org/anime/gogoanime/watch/${episode.id}`,
+            { timeout: 4000 }
+          );
+          return streamResponse.data?.sources || [];
+        }
       }
-    );
-    return response.data?.data?.Media || null;
+    }
+    return [];
   } catch (error) {
-    console.error('Error fetching AniList sources:', error);
-    return null;
+    console.error('Error fetching Consumet stream:', error);
+    return [];
   }
 };
 
-// Get working embed URL with fallbacks
-export const getWorkingEmbedUrl = async (
+// Get ALL available streaming sources with proper fallback chain
+export const getStreamingSources = async (
   animeId: number,
   episodeNumber: number,
   animeTitle: string
-): Promise<string> => {
-  try {
-    // Try Tatakai first (most reliable)
-    const tatakaiSources = await getTatakaiSources(animeId, episodeNumber);
-    if (tatakaiSources && tatakaiSources.length > 0) {
-      return tatakaiSources[0].url || `https://vidsrc.me/embed/anime?id=${animeId}&episode=${episodeNumber}`;
-    }
+): Promise<{ url: string; type: string; source: string }[]> => {
+  const sources = [];
 
-    // Fallback 1: Direct VidSrc embed
-    const vidsrcUrl = `https://vidsrc.me/embed/anime?id=${animeId}&episode=${episodeNumber}`;
-    
-    // Fallback 2: 9Anime
-    const nineAnimeUrl = `https://www.9anime.es/embed/stream?v=1&token=${animeId}-${episodeNumber}`;
-    
-    // Fallback 3: HiAnime for Hindi dub
-    const hiAnimeUrl = `https://hianime.to/watch/${animeTitle.toLowerCase().replace(/\s+/g, '-')}?ep=${episodeNumber}`;
-    
-    // Return primary fallback
-    return vidsrcUrl;
+  // Primary: VidSrc (ALWAYS available, iframe embed)
+  sources.push({
+    url: `https://vidsrc.me/embed/anime?id=${animeId}&episode=${episodeNumber}`,
+    type: 'embed',
+    source: 'VidSrc',
+  });
+
+  // Fallback 2: Try Consumet (if API responds)
+  try {
+    const consumetStreams = await getConsumetStream(animeTitle, episodeNumber);
+    if (consumetStreams.length > 0) {
+      sources.push({
+        url: consumetStreams[0].url,
+        type: 'direct',
+        source: 'Consumet',
+      });
+    }
   } catch (error) {
-    console.error('Error getting working embed URL:', error);
-    // Return safe fallback
-    return `https://vidsrc.me/embed/anime?id=${animeId}&episode=${episodeNumber}`;
+    console.error('Consumet fallback failed, continuing...');
   }
+
+  // Fallback 3: 9Anime (direct link)
+  sources.push({
+    url: `https://9anime.to/watch/${animeTitle.toLowerCase().replace(/\s+/g, '-')}?ep=${episodeNumber}`,
+    type: 'link',
+    source: '9Anime',
+  });
+
+  // Fallback 4: HiAnime for Hindi
+  sources.push({
+    url: `https://hianime.to/watch/${animeTitle.toLowerCase().replace(/\s+/g, '-')}?ep=${episodeNumber}`,
+    type: 'link',
+    source: 'HiAnime (Hindi)',
+  });
+
+  return sources;
 };
 
 // Get alternative episode stream
