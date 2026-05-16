@@ -43,15 +43,29 @@ export default function WatchPage() {
   const [episodePage, setEpisodePage] = useState(1);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [quality, setQuality] = useState('720p');
+  const [embedUrl, setEmbedUrl] = useState<string>('');
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const detail = await getAnimeDetails(Number(id));
+        
+        // Load anime details with timeout
+        const detailPromise = getAnimeDetails(Number(id));
+        const detailTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Detail timeout')), 5000)
+        );
+        
+        const detail = await Promise.race([detailPromise, detailTimeout]).catch(() => null) as AnimeDetail | null;
         setAnime(detail);
 
-        const eps = await getAnimeEpisodes(Number(id), 1);
+        // Load episodes with timeout
+        const episodesPromise = getAnimeEpisodes(Number(id), 1);
+        const episodesTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Episodes timeout')), 5000)
+        );
+        
+        const eps = await Promise.race([episodesPromise, episodesTimeout]).catch(() => []);
         setEpisodes(eps || []);
         
         if (eps && eps.length > 0) {
@@ -59,13 +73,23 @@ export default function WatchPage() {
         }
       } catch (error) {
         console.error('Error loading watch page:', error);
+        setLoading(false);
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    if (id) {
+      loadData();
+    }
   }, [id]);
+
+  // Update embed URL when episode changes
+  useEffect(() => {
+    if (selectedEpisode && anime) {
+      setEmbedUrl(getEmbedUrl(selectedEpisode.mal_id));
+    }
+  }, [selectedEpisode, anime, id]);
 
   const loadMoreEpisodes = async () => {
     try {
@@ -81,14 +105,18 @@ export default function WatchPage() {
   };
 
   const getEmbedUrl = (episodeNumber: number) => {
-    // Using iframe embeds from reliable anime streaming sources
-    // These are legal, free sources with permission
+    // Primary: VidSrc (most reliable for anime)
     return `https://vidsrc.me/embed/anime?id=${id}&episode=${episodeNumber}`;
   };
 
   const getAltEmbedUrl = (episodeNumber: number) => {
-    // Alternative embed source
-    return `https://www.9anime.es/embed/stream?v=1&token=${id}-${episodeNumber}`;
+    // Alternative: 9Anime
+    return `https://9anime.to/watch/${anime?.title?.toLowerCase().replace(/\s+/g, '-') || 'anime'}?ep=${episodeNumber}`;
+  };
+
+  const getHindiDubUrl = (episodeNumber: number) => {
+    // Hindi dub option via HiAnime
+    return `https://hianime.to/watch/${anime?.title?.toLowerCase().replace(/\s+/g, '-') || 'anime'}?ep=${episodeNumber}`;
   };
 
   if (loading) {

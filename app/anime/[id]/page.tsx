@@ -47,19 +47,35 @@ export default function AnimeDetail() {
     const loadDetails = async () => {
       try {
         setLoading(true);
-        const detail = await getAnimeDetails(Number(id));
+        
+        // Load with timeout to prevent infinite loading
+        const detailPromise = getAnimeDetails(Number(id));
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+        
+        const detail = await Promise.race([detailPromise, timeoutPromise]).catch(() => null) as AnimeDetail | null;
         setAnime(detail);
 
-        const eps = await getAnimeEpisodes(Number(id), 1);
+        // Load episodes with timeout
+        const epsPromise = getAnimeEpisodes(Number(id), 1);
+        const epsTimeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Episodes timeout')), 5000)
+        );
+        
+        const eps = await Promise.race([epsPromise, epsTimeoutPromise]).catch(() => []) as Episode[];
         setEpisodes(eps || []);
       } catch (error) {
         console.error('Error loading anime details:', error);
+        setLoading(false);
       } finally {
         setLoading(false);
       }
     };
 
-    loadDetails();
+    if (id) {
+      loadDetails();
+    }
   }, [id]);
 
   const handleLoadMoreEpisodes = async () => {
