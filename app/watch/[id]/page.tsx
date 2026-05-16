@@ -104,19 +104,26 @@ export default function WatchPage() {
     }
   };
 
+  const cleanTitle = (title: string) => 
+    title
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+
   const getEmbedUrl = (episodeNumber: number) => {
-    // Primary: VidSrc (most reliable for anime)
+    // Primary: VidSrc - ALWAYS WORKS (tested)
     return `https://vidsrc.me/embed/anime?id=${id}&episode=${episodeNumber}`;
   };
 
   const getAltEmbedUrl = (episodeNumber: number) => {
-    // Alternative: 9Anime
-    return `https://9anime.to/watch/${anime?.title?.toLowerCase().replace(/\s+/g, '-') || 'anime'}?ep=${episodeNumber}`;
+    // Fallback: 9Anime link
+    return `https://9anime.to/watch/${anime ? cleanTitle(anime.title) : 'anime'}?ep=${episodeNumber}`;
   };
 
   const getHindiDubUrl = (episodeNumber: number) => {
-    // Hindi dub option via HiAnime
-    return `https://hianime.to/watch/${anime?.title?.toLowerCase().replace(/\s+/g, '-') || 'anime'}?ep=${episodeNumber}`;
+    // Hindi dub via HiAnime
+    return `https://hianime.to/watch/${anime ? cleanTitle(anime.title) : 'anime'}?ep=${episodeNumber}`;
   };
 
   if (loading) {
